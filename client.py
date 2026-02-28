@@ -25,7 +25,7 @@ URI = input("Enter WebSocket URI: ") or "ws://localhost:8765"
 def textcoloring(text,color):
     return f"{color}{text}{RESET}"
 
-print("Please log in with your rotur account to continue. We guarantee that your credentials are not stored or used for any other purpose than fetching your username for the chat.")
+print("Please log in with your rotur account to continue. We guarantee that your credentials are not stored or used for any other purpose than fetching your username for the chat. If you do not feel comfortable providing your credentials, you can create a new rotur account with a random email and password just for this purpose, or ping fries for help.")
 
 username = input("Username: ")
 password = input("Password: ")
