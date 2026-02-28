@@ -6,6 +6,8 @@ import re
 import hashlib
 import sys
 import datetime
+import threading
+import os
 
 global sentwelcome
 sentwelcome = 0
@@ -77,6 +79,62 @@ ANSI_RE = re.compile(r'\x1B\[[0-?]*[ -/]*[@-~]')
 def strip_ansi(s: str) -> str:
     return ANSI_RE.sub('', s)
 
+
+# Line-buffer and stdin thread for package-free prompt handling
+buffer = {"s": ""}
+buffer_lock = threading.Lock()
+
+def stdin_reader(loop, q, buffer, lock):
+    if os.name == "nt":
+        import msvcrt
+        while True:
+            ch = msvcrt.getwch()
+            with lock:
+                if ch in ("\r", "\n"):
+                    line = buffer["s"]
+                    buffer["s"] = ""
+                    asyncio.run_coroutine_threadsafe(q.put(line), loop)
+                    sys.stdout.write("\r\x1b[K> ")
+                    sys.stdout.flush()
+                elif ch == "\x03":
+                    # Ctrl+C
+                    raise KeyboardInterrupt
+                elif ch == "\x08":  # backspace
+                    buffer["s"] = buffer["s"][:-1]
+                    sys.stdout.write("\r\x1b[K> " + buffer["s"])
+                    sys.stdout.flush()
+                else:
+                    buffer["s"] += ch
+                    sys.stdout.write(ch)
+                    sys.stdout.flush()
+    else:
+        import tty, termios
+        fd = sys.stdin.fileno()
+        old = termios.tcgetattr(fd)
+        tty.setcbreak(fd)
+        try:
+            while True:
+                ch = sys.stdin.read(1)
+                with lock:
+                    if ch in ("\r", "\n"):
+                        line = buffer["s"]
+                        buffer["s"] = ""
+                        asyncio.run_coroutine_threadsafe(q.put(line), loop)
+                        sys.stdout.write("\r\x1b[K> ")
+                        sys.stdout.flush()
+                    elif ch == "\x03":
+                        raise KeyboardInterrupt
+                    elif ch == "\x7f":  # backspace
+                        buffer["s"] = buffer["s"][:-1]
+                        sys.stdout.write("\r\x1b[K> " + buffer["s"])
+                        sys.stdout.flush()
+                    else:
+                        buffer["s"] += ch
+                        sys.stdout.write(ch)
+                        sys.stdout.flush()
+        finally:
+            termios.tcsetattr(fd, termios.TCSADRAIN, old)
+
 async def send_message(websocket, messageinput):
     now = datetime.datetime.now()
     date = now.strftime("[%m/%d : %H %M %S]")
@@ -86,32 +144,34 @@ async def send_message(websocket, messageinput):
     if messageinput.lower() in ("exit", "quit"):
         await websocket.close()
         return
-    delete_lines(1)
     await websocket.send(f"{formatteddate} {formattedusername}: {messageinput}")
 
 
 
-async def send_loop(websocket):
-    """Read blocking input in executor and send messages until exit."""
-    loop = asyncio.get_event_loop()
+async def send_loop(websocket, input_queue):
+    """Read completed lines from the stdin thread via an asyncio.Queue."""
     while True:
-        messageinput = await loop.run_in_executor(None, input_clean)
+        messageinput = await input_queue.get()
         if messageinput.lower() in ("exit", "quit"):
             await websocket.close()
             break
-        now = datetime.datetime.now()
-        date = now.strftime("[%m/%d : %H %M %S]")
-        formatteddate = textcoloring(date, GREEN)
-        formattedusername = textcoloring(username, BLUE)
-        delete_lines(1)
-        await websocket.send(f"{formatteddate} {formattedusername}: {messageinput}")
+        await send_message(websocket, messageinput)
 
-async def receive_messages(websocket):
+async def receive_messages(websocket, input_queue):
     try:
         async for message in websocket:
-            print(message)
+            with buffer_lock:
+                # clear current prompt line, print the incoming message, reprint prompt + buffer
+                sys.stdout.write("\r\x1b[K")
+                print(message)
+                sys.stdout.write("> " + buffer["s"])
+                sys.stdout.flush()
     except websockets.ConnectionClosed:
-        print("Connection closed.")
+        with buffer_lock:
+            sys.stdout.write("\r\x1b[K")
+            print("Connection closed.")
+            sys.stdout.write("> " + buffer["s"])
+            sys.stdout.flush()
 
 async def main():
     global sentwelcome
@@ -121,9 +181,14 @@ async def main():
             sentwelcome = 1
         print("Connected.")
 
-        receive_task = asyncio.create_task(receive_messages(websocket))
-        send_task = asyncio.create_task(send_loop(websocket))
+        # Create input queue and start stdin reader thread
+        input_queue = asyncio.Queue()
         loop = asyncio.get_event_loop()
+        t = threading.Thread(target=stdin_reader, args=(loop, input_queue, buffer, buffer_lock), daemon=True)
+        t.start()
+
+        receive_task = asyncio.create_task(receive_messages(websocket, input_queue))
+        send_task = asyncio.create_task(send_loop(websocket, input_queue))
 
         async def _shutdown():
             try:
@@ -139,7 +204,7 @@ async def main():
             print("\nDisconnected gracefully.")
 
         try:
-            loop.add_signal_handler(signal.SIGINT, lambda: asyncio.create_task(_shutdown()))
+                loop.add_signal_handler(signal.SIGINT, lambda: asyncio.create_task(_shutdown()))
         except NotImplementedError:
             signal.signal(signal.SIGINT, lambda s, f: asyncio.create_task(_shutdown()))
 
