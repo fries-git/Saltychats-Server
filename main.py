@@ -21,6 +21,12 @@ else:
         webhook = 1
 
 async def echo(websocket):
+    # Send server name to the client when they connect
+    try:
+        await websocket.send(f"Welcome to {servername}! We hope you'll enjoy your stay here.")
+    except Exception as e:
+        print("Failed to send servername to client:", e)
+
     async for message in websocket:
         print(message)
         await websocket.send(message)

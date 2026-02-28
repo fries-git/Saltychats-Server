@@ -24,7 +24,7 @@ URI = input("Enter WebSocket URI: ") or "ws://localhost:8765"
 def textcoloring(text,color):
     return f"{color}{text}{RESET}"
 
-print("Welcome to Saltychat! Please log in with your rotur account to continue.")
+print("Please log in with your rotur account to continue. We guarantee that your credentials are not stored or used for any other purpose than fetching your username for the chat.")
 
 username = input("Username: ")
 password = input("Password: ")
