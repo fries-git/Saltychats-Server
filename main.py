@@ -6,14 +6,14 @@ import os
 
 webhook = 0
 dotenv.load_dotenv()
-servername = os.getenv("servername")
+servername = os.getenv("servername", "WebSocket Server")
 #This is optional. Create a .env file with the line "webhook=your_webhook_url" to use a discord webhook for logging messages.
 try:
     discordwebhook=os.getenv("webhook")
 except requests.exceptions.RequestException as e:
     print("Something went wrong:", e)
 else:
-    if discordwebhook is not None:
+    if discordwebhook is not None and discordwebhook != "":
         print("Discord webhook loaded successfully.")
         print("Webhook URL:", discordwebhook)
         webhook = 1

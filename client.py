@@ -1,4 +1,5 @@
 import asyncio
+import signal
 import websockets
 import requests
 import re
@@ -119,10 +120,32 @@ async def main():
             await send_message(websocket, f"{username} has joined the chat.")
             sentwelcome = 1
         print("Connected.")
-        await asyncio.gather(
-            receive_messages(websocket),
-            send_loop(websocket),
-        )
 
+        receive_task = asyncio.create_task(receive_messages(websocket))
+        send_task = asyncio.create_task(send_loop(websocket))
+        loop = asyncio.get_event_loop()
+
+        async def _shutdown():
+            try:
+                await send_message(websocket, f"{username} has left the chat.")
+            except Exception:
+                pass
+            for t in (receive_task, send_task):
+                t.cancel()
+            try:
+                await websocket.close()
+            except Exception:
+                pass
+            print("\nDisconnected gracefully.")
+
+        try:
+            loop.add_signal_handler(signal.SIGINT, lambda: asyncio.create_task(_shutdown()))
+        except NotImplementedError:
+            signal.signal(signal.SIGINT, lambda s, f: asyncio.create_task(_shutdown()))
+
+        try:
+            await asyncio.gather(receive_task, send_task)
+        except asyncio.CancelledError:
+            pass
 if __name__ == "__main__":
     asyncio.run(main())
