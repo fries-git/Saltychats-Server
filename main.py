@@ -1,5 +1,3 @@
-servername = "Saltychat Official Server"
-
 import asyncio
 from websockets.asyncio.server import serve
 import requests
@@ -8,7 +6,7 @@ import os
 
 webhook = 0
 dotenv.load_dotenv()
-
+servername = os.getenv("servername")
 #This is optional. Create a .env file with the line "webhook=your_webhook_url" to use a discord webhook for logging messages.
 try:
     discordwebhook=os.getenv("webhook")
