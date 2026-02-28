@@ -1,6 +1,10 @@
 asyncio
+signal
 websockets
 requests
+re
 hashlib
 sys
 datetime
+dotenv
+os
