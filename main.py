@@ -6,7 +6,10 @@ import os
 
 webhook = 0
 dotenv.load_dotenv()
+
+port = os.getenv("port", 8080)
 servername = os.getenv("servername", "WebSocket Server")
+
 #This is optional. Create a .env file with the line "webhook=your_webhook_url" to use a discord webhook for logging messages.
 try:
     discordwebhook=os.getenv("webhook")
@@ -36,7 +39,6 @@ async def echo(websocket):
                 print("Failed to send message to Discord webhook:", e)
 
 async def main():
-    port = 8080
     ip = "localhost"
     async with serve(echo, ip, port) as server:
         print(f"Server started at {ip}:{port}")
