@@ -24,6 +24,8 @@ URI = input("Enter WebSocket URI: ") or "ws://localhost:8765"
 def textcoloring(text,color):
     return f"{color}{text}{RESET}"
 
+print("Welcome to Saltychat! Please log in with your rotur account to continue.")
+
 username = input("Username: ")
 password = input("Password: ")
 md5_hash = hashlib.md5(password.encode()).hexdigest()
