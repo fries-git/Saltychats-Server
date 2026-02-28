@@ -1,9 +1,13 @@
 import asyncio
 import websockets
 import requests
+import re
 import hashlib
 import sys
 import datetime
+
+global sentwelcome
+sentwelcome = 0
 
 BLACK   = "\033[30m"
 RED     = "\033[31m"
@@ -59,37 +63,63 @@ except Exception as err:
     print(textcoloring(f"Failed to fetch user data, please try again: {err}", RED))
     sys.exit(1)
 
-async def send_messages(websocket):
-    def input_clean(prompt=""):
-        message = input(prompt)
-        delete_lines(1)
-        return message
+def input_clean(prompt=""):
+    message = input(prompt)
+    return message
 
+
+# ANSI escape sequence stripper
+ANSI_RE = re.compile(r'\x1B\[[0-?]*[ -/]*[@-~]')
+
+def strip_ansi(s: str) -> str:
+    return ANSI_RE.sub('', s)
+
+async def send_message(websocket, messageinput):
     now = datetime.datetime.now()
     date = now.strftime("[%m/%d : %H %M %S]")
     formatteddate = textcoloring(date, GREEN)
     formattedusername = textcoloring(username, BLUE)
 
+    if messageinput.lower() in ("exit", "quit"):
+        await websocket.close()
+        return
+    delete_lines(1)
+    await websocket.send(f"{formatteddate} {formattedusername}: {messageinput}")
+
+
+
+async def send_loop(websocket):
+    """Read blocking input in executor and send messages until exit."""
+    loop = asyncio.get_event_loop()
     while True:
-        message = await asyncio.to_thread(input_clean, "> ")
-        if message.lower() in ("exit", "quit"):
+        messageinput = await loop.run_in_executor(None, input_clean)
+        if messageinput.lower() in ("exit", "quit"):
             await websocket.close()
             break
-        await websocket.send(f"{formatteddate} {formattedusername}: {message}")
+        now = datetime.datetime.now()
+        date = now.strftime("[%m/%d : %H %M %S]")
+        formatteddate = textcoloring(date, GREEN)
+        formattedusername = textcoloring(username, BLUE)
+        delete_lines(1)
+        await websocket.send(f"{formatteddate} {formattedusername}: {messageinput}")
 
 async def receive_messages(websocket):
     try:
         async for message in websocket:
-            print(f"\n< {message}")
+            print(message)
     except websockets.ConnectionClosed:
         print("Connection closed.")
 
 async def main():
+    global sentwelcome
     async with websockets.connect(URI) as websocket:
+        if sentwelcome == 0:
+            await send_message(websocket, f"{username} has joined the chat.")
+            sentwelcome = 1
         print("Connected.")
         await asyncio.gather(
-            send_messages(websocket),
-            receive_messages(websocket)
+            receive_messages(websocket),
+            send_loop(websocket),
         )
 
 if __name__ == "__main__":
