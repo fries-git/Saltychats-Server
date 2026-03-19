@@ -9,9 +9,11 @@ Next, simply run main.py, and connect to it via client.py. Its on localhost:defi
 > The webhook system is currently highly unreccomended, as the text coloring and formatting leads to very messy messages. Be patient, it'll be implemented soon along with Discord integration (from discord to your server as webhooks can send to discord,) Fluxer integration, (Fluxer to your server as webhooks can already send to Fluxer,) and IRC implementation (to and from.) 
 
 ## TO-DO
-- [] Move away from Rotur, make this entirely independent.
-- [] Use JSON for messages.
-- [] Add message storage and fetching.
-- [] Update client to support these changes.
-- [] Remove anything that I ai-generated to test or just do a quick patch before I left and then didn't work on this for a half a month.
-- [] Add channels.
+- [ ] Move away from Rotur, make this entirely independent.
+- [ ] Use JSON for messages.
+- [ ] Add message storage and fetching.
+- [ ] Update client to support these changes.
+- [ ] Remove anything that I ai-generated to test or just do a quick patch before I left and then didn't work on this for a half a month.
+- [ ] Add channels.
+- [ ] Add user icons.
+- [ ] Store data in a nice human-readable DB.
