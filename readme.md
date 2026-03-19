@@ -10,10 +10,15 @@ Next, simply run main.py, and connect to it via client.py. Its on localhost:defi
 
 ## TO-DO
 - [ ] Move away from Rotur, make this entirely independent.
-- [ ] Use JSON for messages.
+- [ ] Use JSON for messages and remove the message encoded coloring.
+- [ ] Make the coloring on text purely client-sided.
 - [ ] Add message storage and fetching.
 - [ ] Update client to support these changes.
 - [ ] Remove anything that I ai-generated to test or just do a quick patch before I left and then didn't work on this for a half a month.
 - [ ] Add channels.
 - [ ] Add user icons.
 - [ ] Store data in a nice human-readable DB.
+- [ ] Implement plugins system with easy to use functions for reading and sending messages.
+- [ ] Add Fluxer plugin.
+- [ ] Add discord plugin.
+- [ ] Add IRC plugin (easiest.)
