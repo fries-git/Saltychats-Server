@@ -14,7 +14,7 @@ Next, simply run main.py, and connect to it via client.py. Its on localhost:defi
 - [ ] Make the coloring on text purely client-sided.
 - [ ] Add message storage and fetching.
 - [ ] Update client to support these changes.
-- [ ] Remove anything that I ai-generated to test or just do a quick patch before I left and then didn't work on this for a half a month.
+- [ ] Remove anything that I ai-generated to test or just do a quick patch before I left and then didn't work on this for a half a month. (shit)
 - [ ] Add channels.
 - [ ] Add user icons.
 - [ ] Store data in a nice human-readable DB.
