@@ -1,7 +1,6 @@
 import asyncio
 import signal
 import websockets
-import requests
 import re
 import hashlib
 import sys
@@ -22,7 +21,7 @@ CYAN    = "\033[36m"
 WHITE   = "\033[37m"
 RESET = "\033[0m"
 
-URI = input("Enter WebSocket URI: ") or "ws://localhost:8765"
+URI = input("Enter WebSocket URI: ") or "ws://localhost:8080"
 
 def textcoloring(text,color):
     return f"{color}{text}{RESET}"
@@ -33,45 +32,13 @@ username = input("Username: ")
 password = input("Password: ")
 md5_hash = hashlib.md5(password.encode()).hexdigest()
 
-def delete_lines(n: int):
-    """Delete the last n lines fully in the terminal."""
-    for _ in range(n):
-        # Move cursor up
-        sys.stdout.write("\033[F")
-        # Move to start of line
-        sys.stdout.write("\r")
-        # Overwrite line with spaces
-        sys.stdout.write("\033[K")  # Clear to end of line
-    sys.stdout.flush()
-
-delete_lines(2)
-
-get_user_api = "https://social.rotur.dev/get_user"
-
-params = {
+send_message = {
+  "command": "logininfo",
+  "data": {
     "username": username,
     "password": md5_hash
+  }
 }
-
-try:
-    response = requests.get(get_user_api, params=params)
-    response.raise_for_status()  # Raises error for bad HTTP status codes
-
-    data = response.json()
-
-    if "error" in data and data["error"]:
-        raise Exception(data["error"])
-
-#    print("User data:", data)  # rotur account object
-
-except Exception as err:
-    print(textcoloring(f"Failed to fetch user data, please try again: {err}", RED))
-    sys.exit(1)
-
-def input_clean(prompt=""):
-    message = input(prompt)
-    return message
-
 
 # ANSI escape sequence stripper
 ANSI_RE = re.compile(r'\x1B\[[0-?]*[ -/]*[@-~]')
@@ -107,33 +74,6 @@ def stdin_reader(loop, q, buffer, lock):
                     buffer["s"] += ch
                     sys.stdout.write(ch)
                     sys.stdout.flush()
-    else:
-        import tty, termios
-        fd = sys.stdin.fileno()
-        old = termios.tcgetattr(fd)
-        tty.setcbreak(fd)
-        try:
-            while True:
-                ch = sys.stdin.read(1)
-                with lock:
-                    if ch in ("\r", "\n"):
-                        line = buffer["s"]
-                        buffer["s"] = ""
-                        asyncio.run_coroutine_threadsafe(q.put(line), loop)
-                        sys.stdout.write("\r\x1b[K> ")
-                        sys.stdout.flush()
-                    elif ch == "\x03":
-                        raise KeyboardInterrupt
-                    elif ch == "\x7f":  # backspace
-                        buffer["s"] = buffer["s"][:-1]
-                        sys.stdout.write("\r\x1b[K> " + buffer["s"])
-                        sys.stdout.flush()
-                    else:
-                        buffer["s"] += ch
-                        sys.stdout.write(ch)
-                        sys.stdout.flush()
-        finally:
-            termios.tcsetattr(fd, termios.TCSADRAIN, old)
 
 async def send_message(websocket, messageinput):
     now = datetime.datetime.now()
