@@ -3,138 +3,425 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Terminal Client</title>
+<title>Terminal WebSocket Client</title>
 <style>
-body {
-  margin:0;
-  background:#000;
-  color:#00ff9c;
-  font-family: monospace;
-}
+  :root {
+    color-scheme: dark;
+    --bg: #050607;
+    --panel: #0a0f0c;
+    --panel2: #07110c;
+    --text: #a8ffbf;
+    --muted: #74a583;
+    --line: rgba(120, 255, 170, 0.14);
+    --accent: #2cff7a;
+    --danger: #ff6b6b;
+    --warn: #ffd166;
+  }
 
-#terminal {
-  padding:15px;
-  height:100vh;
-  overflow-y:auto;
-  white-space:pre-wrap;
-}
+  * { box-sizing: border-box; }
 
-#inputBar {
-  position:fixed;
-  bottom:0;
-  width:100%;
-  display:flex;
-  background:#000;
-  border-top:1px solid #00ff9c;
-}
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background:
+      radial-gradient(circle at top, rgba(44, 255, 122, 0.08), transparent 28%),
+      linear-gradient(180deg, #020302, #050607 55%, #020302);
+    color: var(--text);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  }
 
-input {
-  flex:1;
-  background:#000;
-  color:#00ff9c;
-  border:none;
-  padding:12px;
-  font-family: monospace;
-  outline:none;
-}
+  .wrap {
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    padding: 16px;
+    gap: 12px;
+  }
+
+  .topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    border: 1px solid var(--line);
+    background: rgba(10, 15, 12, 0.86);
+    padding: 12px 14px;
+    border-radius: 14px;
+  }
+
+  .title {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .title strong {
+    color: var(--accent);
+    letter-spacing: 0.04em;
+  }
+
+  .status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+
+  .dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 999px;
+    background: var(--danger);
+    box-shadow: 0 0 0 4px rgba(255, 107, 107, 0.08);
+  }
+
+  .dot.online {
+    background: var(--accent);
+    box-shadow: 0 0 0 4px rgba(44, 255, 122, 0.10);
+  }
+
+  .terminal {
+    flex: 1;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: linear-gradient(180deg, rgba(7, 17, 12, 0.96), rgba(4, 7, 5, 0.96));
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .output {
+    flex: 1;
+    overflow-y: auto;
+    padding: 14px;
+    white-space: pre-wrap;
+    line-height: 1.45;
+  }
+
+  .line {
+    margin: 0 0 8px 0;
+    word-break: break-word;
+  }
+
+  .sys { color: var(--muted); }
+  .ok { color: var(--accent); }
+  .bad { color: var(--danger); }
+  .warn { color: var(--warn); }
+
+  .promptbar {
+    display: flex;
+    align-items: center;
+    border-top: 1px solid var(--line);
+    background: rgba(3, 6, 4, 0.9);
+    padding: 10px 12px;
+    gap: 10px;
+  }
+
+  .prompt {
+    color: var(--accent);
+    white-space: nowrap;
+  }
+
+  input {
+    flex: 1;
+    border: none;
+    outline: none;
+    background: transparent;
+    color: var(--text);
+    font: inherit;
+    caret-color: var(--accent);
+  }
+
+  input::placeholder {
+    color: rgba(168, 255, 191, 0.35);
+  }
+
+  .hint {
+    color: var(--muted);
+    font-size: 12px;
+    padding: 0 2px;
+  }
+
+  .row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 6px;
+  }
+
+  button {
+    border: 1px solid var(--line);
+    background: rgba(10, 15, 12, 0.86);
+    color: var(--text);
+    font: inherit;
+    padding: 8px 10px;
+    border-radius: 10px;
+    cursor: pointer;
+  }
+
+  button:hover {
+    border-color: rgba(44, 255, 122, 0.35);
+  }
+
+  .mini {
+    color: var(--muted);
+    font-size: 12px;
+  }
 </style>
 </head>
 <body>
-<div id="terminal"></div>
-<div id="inputBar">
-  <input id="input" placeholder="type command..." autofocus />
-</div>
+  <div class="wrap">
+    <div class="topbar">
+      <div class="title">
+        <strong>TERMINAL CLIENT</strong>
+        <div class="mini">Commands: <span class="ok">/login user pass</span>, <span class="ok">/msg text</span>, <span class="ok">/ping</span>, <span class="ok">/help</span></div>
+      </div>
+      <div class="status">
+        <span class="dot" id="dot"></span>
+        <span id="statusText">disconnected</span>
+      </div>
+    </div>
+
+    <div class="terminal">
+      <div class="output" id="output"></div>
+
+      <div class="promptbar">
+        <span class="prompt" id="prompt">&gt;</span>
+        <input id="cmd" type="text" autocomplete="off" spellcheck="false" placeholder="type /help" />
+      </div>
+    </div>
+
+    <div class="row">
+      <button id="connectBtn">Connect</button>
+      <button id="disconnectBtn">Disconnect</button>
+      <button id="clearBtn">Clear</button>
+    </div>
+    <div class="hint" id="hint">Not logged in. Messages are blocked until login is verified by the server.</div>
+  </div>
 
 <script>
-const term = document.getElementById("terminal");
-const input = document.getElementById("input");
+  const output = document.getElementById("output");
+  const cmd = document.getElementById("cmd");
+  const statusText = document.getElementById("statusText");
+  const dot = document.getElementById("dot");
+  const promptEl = document.getElementById("prompt");
+  const hint = document.getElementById("hint");
 
-let socket;
-let loggedIn = false;
-let username = "";
+  const connectBtn = document.getElementById("connectBtn");
+  const disconnectBtn = document.getElementById("disconnectBtn");
+  const clearBtn = document.getElementById("clearBtn");
 
-function log(text) {
-  term.textContent += text + "\n";
-  term.scrollTop = term.scrollHeight;
-}
+  let socket = null;
+  let authed = false;
+  let username = "";
 
-function connect() {
-  const host = window.location.hostname || "localhost";
-  socket = new WebSocket(`ws://${host}:8080`);
+  function print(text, cls = "sys") {
+    const line = document.createElement("div");
+    line.className = `line ${cls}`;
+    line.textContent = text;
+    output.appendChild(line);
+    output.scrollTop = output.scrollHeight;
+  }
 
-  socket.onopen = () => log("[connected]");
-  socket.onclose = () => log("[disconnected]");
-  socket.onerror = () => log("[error]");
+  function setStatus(text, online = false) {
+    statusText.textContent = text;
+    dot.classList.toggle("online", online);
+  }
 
-  socket.onmessage = (e) => {
-    let data;
-    try { data = JSON.parse(e.data); } catch {
-      log(e.data);
+  function serverUrl() {
+    const host = window.location.hostname || "localhost";
+    return `ws://${host}:8080`;
+  }
+
+  function connect() {
+    if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) {
+      print("already connected or connecting", "warn");
       return;
     }
 
-    if (data.status === "success" && data.message === "logged in") {
-      loggedIn = true;
-      log("[login successful]");
-    } else if (data.status === "fail") {
-      log("[login failed]");
-    } else if (data.message) {
-      log(data.message);
+    const url = serverUrl();
+    print(`connecting to ${url} ...`, "sys");
+    setStatus("connecting", false);
+
+    socket = new WebSocket(url);
+
+    socket.onopen = () => {
+      print("connection established", "ok");
+      setStatus("connected", true);
+      hint.textContent = "Connected. Log in with /login user pass";
+    };
+
+    socket.onclose = () => {
+      print("connection closed", "bad");
+      setStatus("disconnected", false);
+      authed = false;
+      username = "";
+      promptEl.textContent = ">";
+      hint.textContent = "Not logged in. Messages are blocked until login is verified by the server.";
+    };
+
+    socket.onerror = () => {
+      print("socket error", "bad");
+      setStatus("error", false);
+    };
+
+    socket.onmessage = (event) => {
+      let data = event.data;
+
+      try {
+        const parsed = JSON.parse(event.data);
+
+        if (parsed && typeof parsed === "object") {
+          if (parsed.status === "success" && parsed.message === "logged in") {
+            authed = true;
+            setStatus(`connected as ${username}`, true);
+            promptEl.textContent = `${username}>`;
+            hint.textContent = "Login verified. You can send messages now.";
+            print("login verified", "ok");
+            return;
+          }
+
+          if (parsed.status === "fail") {
+            authed = false;
+            promptEl.textContent = ">";
+            print(parsed.message || "login failed", "bad");
+            hint.textContent = "Login failed. Try again.";
+            return;
+          }
+
+          if (parsed.status === "created") {
+            authed = false;
+            print(parsed.message || "account created", "warn");
+            hint.textContent = "Account was created. Log in again to verify.";
+            return;
+          }
+
+          if (parsed.message) {
+            print(parsed.message, "sys");
+            return;
+          }
+
+          print("received a server response", "sys");
+          return;
+        }
+      } catch (_) {
+        // not JSON, print as plain terminal output
+      }
+
+      print(String(data), "sys");
+    };
+  }
+
+  function disconnect() {
+    if (socket) socket.close();
+  }
+
+  function clear() {
+    output.innerHTML = "";
+  }
+
+  function send(payload) {
+    if (!socket || socket.readyState !== WebSocket.OPEN) {
+      print("not connected", "bad");
+      return false;
     }
-  };
-}
+    socket.send(JSON.stringify(payload));
+    return true;
+  }
 
-function send(obj) {
-  if (socket.readyState !== 1) return;
-  socket.send(JSON.stringify(obj));
-}
-
-input.addEventListener("keydown", (e) => {
-  if (e.key !== "Enter") return;
-
-  const cmd = input.value.trim();
-  input.value = "";
-
-  if (!cmd) return;
-
-  log("> " + cmd);
-
-  const parts = cmd.split(" ");
-
-  if (parts[0] === "login") {
-    if (parts.length < 3) {
-      log("usage: login <user> <pass>");
-      return;
-    }
-
-    username = parts[1];
+  function doLogin(user, pass) {
+    username = user;
     send({
       command: "login",
-      data: { username: parts[1], password: parts[2] }
+      data: {
+        username: user,
+        password: pass
+      }
     });
+    print(`> /login ${user} ******`, "ok");
+  }
 
-  } else if (parts[0] === "send") {
-    if (!loggedIn) {
-      log("[not logged in]");
+  function doMessage(text) {
+    if (!authed) {
+      print("blocked: login first", "bad");
       return;
     }
 
-    const message = parts.slice(1).join(" ");
     send({
       command: "broadcast",
-      data: { message }
+      data: {
+        message: text
+      }
     });
-
-  } else if (parts[0] === "ping") {
-    send({ command: "ping" });
-
-  } else {
-    log("commands: login, send, ping");
+    print(`${username}> ${text}`, "ok");
   }
-});
 
-connect();
-log("terminal ready. type 'login user pass'");
+  function help() {
+    print("commands:", "sys");
+    print("  /login user pass", "sys");
+    print("  /msg your message here", "sys");
+    print("  /ping", "sys");
+    print("  /help", "sys");
+  }
+
+  function handleCommand(value) {
+    const trimmed = value.trim();
+    if (!trimmed) return;
+
+    if (trimmed === "/help") {
+      help();
+      return;
+    }
+
+    if (trimmed === "/ping") {
+      send({ command: "ping" });
+      print("> /ping", "ok");
+      return;
+    }
+
+    if (trimmed.startsWith("/login ")) {
+      const parts = trimmed.split(" ");
+      if (parts.length < 3) {
+        print("usage: /login user pass", "bad");
+        return;
+      }
+
+      const user = parts[1];
+      const pass = parts.slice(2).join(" ");
+      doLogin(user, pass);
+      return;
+    }
+
+    if (trimmed.startsWith("/msg ")) {
+      doMessage(trimmed.slice(5));
+      return;
+    }
+
+    if (!authed) {
+      print("blocked: log in first with /login user pass", "bad");
+      return;
+    }
+
+    doMessage(trimmed);
+  }
+
+  cmd.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      handleCommand(cmd.value);
+      cmd.value = "";
+    }
+  });
+
+  connectBtn.addEventListener("click", connect);
+  disconnectBtn.addEventListener("click", disconnect);
+  clearBtn.addEventListener("click", clear);
+
+  print("terminal ready", "ok");
+  print("type /help for commands", "sys");
+  connect();
+  cmd.focus();
 </script>
 </body>
 </html>
